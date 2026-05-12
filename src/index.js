@@ -2,22 +2,24 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const db = require('./database/db'); // File db hồi nãy
+const db = require('./database/db');
+const { joinVoiceChannel } = require('@discordjs/voice');
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildVoiceStates // QUAN TRỌNG: Để treo room 24/7
     ]
 });
 
-// Khởi tạo các Collection để lưu lệnh
+// Khởi tạo các Collection
 client.commands = new Collection();
-client.ownerId = process.env.OWNER_ID;
+client.ownerId = process.env.OWNER_ID || '914831312295165982';
 
-// --- Handler nạp lệnh (Simple Handler) ---
+// --- Handler nạp lệnh ---
 const foldersPath = path.join(__dirname, 'commands');
 if (fs.existsSync(foldersPath)) {
     const commandFolders = fs.readdirSync(foldersPath);
@@ -48,5 +50,32 @@ if (fs.existsSync(eventsPath)) {
         }
     }
 }
+
+// --- Logic Tự Động Reconnect Voice 24/7 khi Bot Restart ---
+client.once('ready', async () => {
+    console.log(`✅ ${client.user.tag} đã sẵn sàng!`);
+    
+    // Quét tất cả server để xem room nào cần treo 24/7
+    client.guilds.cache.forEach(async (guild) => {
+        const stayChannelId = await db.get(`stay_vc_${guild.id}`);
+        if (stayChannelId) {
+            const channel = guild.channels.cache.get(stayChannelId);
+            if (channel) {
+                try {
+                    joinVoiceChannel({
+                        channelId: channel.id,
+                        guildId: guild.id,
+                        adapterCreator: guild.voiceAdapterCreator,
+                        selfDeaf: true,
+                        selfMute: true
+                    });
+                    console.log(`🎙️ Đã kết nối lại Voice 24/7 tại server: ${guild.name}`);
+                } catch (e) {
+                    console.error(`❌ Lỗi reconnect voice tại ${guild.name}:`, e);
+                }
+            }
+        }
+    });
+});
 
 client.login(process.env.TOKEN);
