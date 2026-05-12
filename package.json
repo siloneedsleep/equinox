@@ -1,0 +1,11 @@
+{
+  "name": "luminous-bot",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "dependencies": {
+    "discord.js": "^14.13.0",
+    "dotenv": "^16.3.1",
+    "quick.db": "^9.1.7",
+    "better-sqlite3": "^9.0.0"
+  }
+}
