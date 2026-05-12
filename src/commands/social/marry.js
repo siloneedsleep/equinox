@@ -1,64 +1,55 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const db = require('../../database/db');
+const { rings } = require('../../utils/items');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('marry')
-        .setDescription('Cầu hôn người thương với một đám cưới hoành tráng')
-        .addUserOption(opt => opt.setName('user').setRequired(true).setDescription('Người bạn muốn trao nhẫn')),
+        .setDescription('Cầu hôn người thương (Cần có nhẫn trong túi)'),
 
-    async execute(ctx, client) {
-        const { user: author, guild, channel } = ctx;
+    async execute(ctx) {
+        const { user: author, channel } = ctx;
         const target = ctx.options.getUser(0);
 
-        // --- Kiểm tra điều kiện ---
-        if (target.id === author.id) return ctx.reply('⚠️ Định tự cưới chính mình à? Tỉnh táo lại đi!', 'error');
-        if (target.bot) return ctx.reply('⚠️ Bot không biết yêu đâu, đừng cố quá!', 'error');
+        if (!target || target.id === author.id || target.bot) return ctx.reply('⚠️ Đối tượng không hợp lệ!', 'error');
 
-        const authorPartner = await db.get(`partner_${author.id}`);
-        const targetPartner = await db.get(`partner_${target.id}`);
+        // Check tình trạng hôn nhân
+        if (await db.get(`partner_${author.id}`)) return ctx.reply('⚠️ Bạn đã kết hôn rồi!', 'error');
+        if (await db.get(`partner_${target.id}`)) return ctx.reply('⚠️ Người ấy đã có chủ!', 'error');
 
-        if (authorPartner) return ctx.reply('⚠️ Bạn đang trong một mối quan hệ, hãy ly hôn trước khi bắt đầu cái mới!', 'error');
-        if (targetPartner) return ctx.reply(`⚠️ **${target.username}** đã thuộc về người khác rồi.`, 'error');
+        // Check Nhẫn trong túi
+        const userRingId = await db.get(`ring_${author.id}`);
+        if (!userRingId) return ctx.reply('⚠️ Bạn chưa mua nhẫn! Hãy dùng `k!shop` và `k!buy`.', 'error');
+        const ringInfo = rings.find(r => r.id === userRingId);
 
-        // --- Gửi lời cầu hôn ---
         const proposalEmbed = new EmbedBuilder()
             .setTitle('💖 LỜI CẦU HÔN LÃNG MẠN 💖')
-            .setDescription(`**${author.username}** đang quỳ xuống và trao nhẫn cho **${target.username}**!\n\n*"Bạn có đồng ý cùng mình đi đến cuối con đường không?"*`)
-            .setColor(0xff69b4)
-            .setThumbnail(target.displayAvatarURL())
-            .setFooter({ text: 'Bạn có 60 giây để trả lời' });
+            .setDescription(`**${author.username}** đang quỳ xuống, trao chiếc **${ringInfo.emoji} ${ringInfo.name}** cho **${target.username}**!\n\n*"${ringInfo.desc}"*`)
+            .setColor(ringInfo.color)
+            .setFooter({ text: 'Phản hồi trong 60 giây' });
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('accept').setLabel('Em đồng ý! 💍').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('deny').setLabel('Chúng ta chỉ là bạn...').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId('deny').setLabel('Từ chối').setStyle(ButtonStyle.Danger)
         );
 
         const msg = await channel.send({ content: `${target}`, embeds: [proposalEmbed], components: [row] });
-
-        // --- Xử lý phản hồi ---
-        const filter = i => i.user.id === target.id;
-        const collector = msg.createMessageComponentCollector({ filter, time: 60000 });
+        const collector = msg.createMessageComponentCollector({ filter: i => i.user.id === target.id, time: 60000 });
 
         collector.on('collect', async i => {
             if (i.customId === 'accept') {
                 const date = Math.floor(Date.now() / 1000);
-                // Lưu dữ liệu hôn nhân
                 await db.set(`partner_${author.id}`, target.id);
                 await db.set(`partner_${target.id}`, author.id);
                 await db.set(`marry_date_${author.id}`, date);
                 await db.set(`marry_date_${target.id}`, date);
-                await db.add(`family_exp_${author.id}`, 100); // Tặng 100 điểm Family đầu tiên
+                await db.set(`couple_ring_${author.id}`, userRingId);
+                await db.set(`couple_ring_${target.id}`, userRingId);
+                await db.delete(`ring_${author.id}`); // Xóa nhẫn trong túi sau khi dùng
 
-                const successEmbed = new EmbedBuilder()
-                    .setTitle('🎊 ĐÁM CƯỚI THẾ KỶ 🎊')
-                    .setDescription(`Chúc mừng **${author}** và **${target}** đã chính thức kết hôn!\n\n🗓️ **Ngày kỷ niệm:** <t:${date}:D>`)
-                    .setImage('https://i.imgur.com/6Ywv9Zp.gif') // Tìm link gif đám cưới anime/cute
-                    .setColor(0xffd700);
-
-                await i.update({ embeds: [successEmbed], components: [] });
+                await i.update({ content: `🎊 **${author}** và **${target}** đã chính thức kết hôn với **${ringInfo.name}**!`, embeds: [], components: [] });
             } else {
-                await i.update({ content: `💔 **${author}**, rất tiếc... lời cầu hôn đã bị từ chối.`, embeds: [], components: [] });
+                await i.update({ content: '💔 Lời cầu hôn bị từ chối...', embeds: [], components: [] });
             }
         });
     }
