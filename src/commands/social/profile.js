@@ -1,48 +1,37 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const db = require('../../database/db');
+const { rings } = require('../../utils/items');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('profile')
-        .setDescription('Xem hồ sơ cá nhân. (Soi người khác yêu cầu Premium)')
-        .addUserOption(opt => opt.setName('user').setDescription('Người bạn muốn xem hồ sơ')),
+        .setDescription('Xem hồ sơ chi tiết (Soi người khác yêu cầu Premium)'),
 
-    async execute(ctx, client) {
+    async execute(ctx) {
         const target = ctx.options.getUser(0) || ctx.user;
         
-        // --- Check Quyền Soi ---
+        // Logic check Premium khi soi người khác
         if (target.id !== ctx.user.id) {
-            const isPremium = await db.get(`premium_${ctx.user.id}`);
-            const isOwner = ctx.user.id === '914831312295165982';
-            
-            if (!isPremium && !isOwner) {
-                return ctx.reply('⚠️ Bạn cần nâng cấp lên **Premium** để soi hồ sơ người khác!', 'error');
-            }
+            const isPre = await db.get(`premium_${ctx.user.id}`);
+            if (!isPre && ctx.user.id !== '914831312295165982') return ctx.reply('⚠️ Soi người khác cần **Premium**!', 'error');
         }
 
         const money = await db.get(`money_${target.id}`) || 0;
-        const bank = await db.get(`bank_${target.id}`) || 0;
         const partnerId = await db.get(`partner_${target.id}`);
-        const marryDate = await db.get(`marry_date_${target.id}`);
-        const familyExp = await db.get(`family_exp_${target.id}`) || 0;
-
-        const partnerStatus = partnerId ? `<@${partnerId}>` : 'Đang tìm kiếm nửa kia...';
-        const anniversary = marryDate ? `<t:${marryDate}:R>` : 'Chưa kết hôn';
+        const ringId = await db.get(`couple_ring_${target.id}`);
+        const ringInfo = rings.find(r => r.id === ringId);
 
         const embed = new EmbedBuilder()
-            .setTitle(`🌟 HỒ SƠ CỦA ${target.username.toUpperCase()} 🌟`)
-            .setThumbnail(target.displayAvatarURL({ dynamic: true }))
-            .setColor(partnerId ? 0xff69b4 : 0x2b2d31)
+            .setTitle(`🌟 HỒ SƠ: ${target.username} 🌟`)
+            .setThumbnail(target.displayAvatarURL())
+            .setColor(ringInfo ? ringInfo.color : 0x2b2d31)
             .addFields(
-                { name: '💰 Tài Chính', value: `💵 Tiền mặt: \`${money.toLocaleString()}$\` \n✨ Tổng: \`${(money + bank).toLocaleString()}$\``, inline: false },
-                { name: '💍 Hôn Nhân', value: `👤 Bạn đời: ${partnerStatus}\n⏳ Bên nhau: ${anniversary}`, inline: true },
-                { name: '👨‍👩‍👧‍👦 Gia Đình', value: `📈 EXP: \`${familyExp}\``, inline: true }
-            )
-            .setTimestamp();
+                { name: '💰 Tài sản', value: `💵 \`${money.toLocaleString()}$\``, inline: true },
+                { name: '💍 Hôn nhân', value: partnerId ? `<@${partnerId}>` : 'Độc thân', inline: true },
+                { name: '✨ Nhẫn cưới', value: ringInfo ? `${ringInfo.emoji} ${ringInfo.name}` : 'Chưa có', inline: true }
+            );
 
-        if (await db.get(`premium_${target.id}`)) embed.setAuthor({ name: '💎 Người Dùng Premium' });
-        if (target.id === '914831312295165982') embed.setAuthor({ name: '👑 Owner' });
-
+        if (target.id === '914831312295165982') embed.setAuthor({ name: '👑 Vua Vibe Coding' });
         await ctx.reply({ embeds: [embed] });
     }
 };
