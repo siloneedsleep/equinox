@@ -16,7 +16,7 @@ module.exports = {
             'Luminous Engine v15 là một hệ thống bot Discord đa năng, tích hợp kinh tế, giải trí và AI.'
         )
         .addFields(
-            { name: '👑 Trưởng dự án (Project Lead)', value: 'Silo (`914831312295165982`)', inline: false },
+            { name: '👑 Trưởng dự án (Project Lead)', value: 'Silo (`<@914831312295165982>`)', inline: false },
             { name: '✨ Nền tảng', value: 'JavaScript (discord.js v14)', inline: true },
             { name: '🏓 Độ trễ', value: `**${ping}ms**`, inline: true },
             { name: '🌍 Phủ sóng', value: `**${serverCount}** máy chủ`, inline: true }
