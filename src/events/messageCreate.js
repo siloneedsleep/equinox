@@ -9,13 +9,20 @@ module.exports = {
 
         const prefix = client.prefix;
         
-		if (commandName === 'ld') commandName = 'lockdown';
-        
         if (!message.content.startsWith(prefix)) return;
 
+        // 1. Cắt chuỗi để lấy args trước
         const args = message.content.slice(prefix.length).trim().split(/ +/);
-        const commandName = args.shift().toLowerCase();
+        
+        // 2. Khai báo biến commandName bằng "let" để có thể thay đổi giá trị ở dưới
+        let commandName = args.shift().toLowerCase();
 
+        // 3. Xử lý tất cả các phím tắt (Alias) tại đây
+        if (commandName === 'ld') commandName = 'lockdown';
+        if (commandName === 'sp') commandName = 'setpresence';
+        if (commandName === 'sl') commandName = 'setlevel';
+
+        // 4. Lấy lệnh từ bộ nạp commands
         const command = client.commands.get(commandName);
 
         if (!command) return;
