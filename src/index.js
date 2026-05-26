@@ -11,17 +11,15 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates // QUAN TRỌNG: Để treo room 24/7
+        GatewayIntentBits.GuildVoiceStates
     ]
 });
 
 // Khởi tạo các Collection
 client.commands = new Collection();
+client.prefixCommands = new Map();
 client.ownerId = process.env.OWNER_ID || '914831312295165982';
-
-// --- Caching để tối ưu hosting ---
-const commandCache = new Map();
-const eventCache = new Set();
+const PREFIX = process.env.PREFIX || '!';
 
 // --- Handler nạp lệnh ---
 const foldersPath = path.join(__dirname, 'commands');
@@ -38,8 +36,10 @@ if (fs.existsSync(foldersPath)) {
                 const command = require(filePath);
                 
                 if ('data' in command && 'execute' in command) {
-                    client.commands.set(command.data.name, command);
-                    commandCache.set(command.data.name, { folder, file });
+                    const commandName = command.data.name;
+                    client.commands.set(commandName, command);
+                    // Register for prefix commands
+                    client.prefixCommands.set(commandName, command);
                 }
             } catch (error) {
                 console.error(`❌ Lỗi khi nạp lệnh ${file}:`, error);
@@ -65,7 +65,6 @@ if (fs.existsSync(eventsPath)) {
                 } else {
                     client.on(event.name, (...args) => event.execute(...args, client));
                 }
-                eventCache.add(event.name);
             }
         } catch (error) {
             console.error(`❌ Lỗi khi nạp event ${file}:`, error);
@@ -73,12 +72,47 @@ if (fs.existsSync(eventsPath)) {
     }
 }
 
-console.log(`✅ Đã nạp ${eventCache.size} events`);
+console.log(`✅ Đã nạp events`);
+
+// --- Handler cho Prefix Commands ---
+client.on('messageCreate', async (message) => {
+    try {
+        // Ignore bot messages
+        if (message.author.bot) return;
+
+        // Check for prefix
+        if (!message.content.startsWith(PREFIX)) return;
+
+        // Extract command name
+        const args = message.content.slice(PREFIX.length).split(/\s+/);
+        const commandName = args[0]?.toLowerCase();
+
+        if (!commandName) return;
+
+        // Get command
+        const command = client.prefixCommands.get(commandName);
+        if (!command) return;
+
+        try {
+            // Execute hybrid command with message context
+            await command.execute(message, client);
+        } catch (error) {
+            console.error(`❌ Lỗi thực thi lệnh ${commandName}:`, error);
+            await message.reply({
+                content: '❌ Có lỗi xảy ra khi thực thi lệnh.',
+                allowedMentions: { repliedUser: false }
+            }).catch(() => null);
+        }
+    } catch (error) {
+        console.error('❌ Lỗi xử lý messageCreate:', error);
+    }
+});
 
 // --- Logic Tự Động Reconnect Voice 24/7 khi Bot Restart ---
 client.once('ready', async () => {
     console.log(`✅ ${client.user.tag} đã sẵn sàng!`);
     console.log(`📊 Kết nối ${client.guilds.cache.size} server`);
+    console.log(`🔧 Prefix: ${PREFIX}`);
     
     // Quét tất cả server để xem room nào cần treo 24/7 (với timeout)
     const reconnectPromises = client.guilds.cache.map(async (guild) => {
@@ -114,7 +148,6 @@ client.once('ready', async () => {
         }
     });
 
-    // Chạy tất cả reconnect song song nhưng có timeout chung
     await Promise.all(reconnectPromises).catch(err => {
         console.error('❌ Lỗi trong quá trình reconnect voice:', err);
     });
@@ -127,7 +160,6 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
-    // Optional: Restart bot hoặc ghi log
 });
 
 // --- Safe Login ---
