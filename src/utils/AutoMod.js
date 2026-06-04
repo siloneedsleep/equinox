@@ -1,3 +1,4 @@
+const { EmbedBuilder } = require('discord.js');
 const dataManager = require('./DataManager');
 
 class AutoMod {
@@ -93,8 +94,20 @@ class AutoMod {
                 // Xóa tang chứng vi phạm
                 await message.delete().catch(() => {});
                 
-                // Cảnh báo công khai và tự hủy sau 5 giây để không rác khung chat
-                const warningMsg = await message.channel.send(`⚠️ ${message.author}, bạn đã bị cảnh cáo: **${reason}**.`);
+                // Úp sọt bằng Embed đỏ chót theo lệnh sếp
+                const warnEmbed = new EmbedBuilder()
+                    .setColor('#ff3333') // Đỏ báo động
+                    .setTitle('🚨 HỆ THỐNG AUTOMOD 🚨')
+                    .setDescription(`**Vi phạm:** ${reason}\n**Đối tượng:** ${message.author}`)
+                    .setFooter({ text: 'Hành vi của bạn đã bị ghi nhận.' })
+                    .setTimestamp();
+
+                const warningMsg = await message.channel.send({ 
+                    content: `${message.author}`, // Ping nhẹ bên ngoài để user chú ý
+                    embeds: [warnEmbed] 
+                });
+                
+                // Tự hủy thông báo sau 5 giây để tránh rác khung chat
                 setTimeout(() => warningMsg.delete().catch(() => {}), 5000);
 
                 // Úp mặt vào tường (Timeout) 1 phút
