@@ -28,8 +28,17 @@ async def global_tenebris_check(ctx):
 
 @bot.event
 async def on_ready():
-    print(f"🔮 {bot.user.name} (ID: {bot.user.id}) đã thức tỉnh tại Chợ Đen!")
+    print(f"☀️/🔮 {bot.user.name} (ID: {bot.user.id}) đã thức tỉnh!")
     await init_redis_system()
+    
+    # Nạp module dùng chung
+    await bot.load_extension("cogs_shared.core_twilight")
+    
+    try:
+        synced = await bot.tree.sync()
+        print(f"Đã đồng bộ {len(synced)} Slash Commands.")
+    except Exception as e:
+        print(f"❌ Lỗi đồng bộ lệnh: {e}")
     tenebris_presence_task.start()
 
 @tasks.loop(seconds=15)
