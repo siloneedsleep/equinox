@@ -45,16 +45,19 @@ async def on_ready():
         except Exception as e:
             print(f"❌ Lỗi load extension {ext}: {e}")
             
-    # Tự động quét và load thêm tất cả file trong thư mục cogs (nếu có)
-    cogs_dir = os.path.join(current_dir, 'cogs')
+   # Tự động quét và load thêm tất cả file trong thư mục cogs_shared
+    cogs_dir = os.path.join(current_dir, 'cogs_shared')
     if os.path.exists(cogs_dir):
         for filename in os.listdir(cogs_dir):
             if filename.endswith('.py') and not filename.startswith('__'):
+                # Bỏ qua 2 file đã load cứng ở trên để tránh lỗi trùng lặp
+                if filename[:-3] in ['core_twilight', 'marry_khcuoc']:
+                    continue
                 try:
-                    await bot.load_extension(f'cogs.{filename[:-3]}')
+                    await bot.load_extension(f'cogs_shared.{filename[:-3]}')
                     print(f"✅ Đã load cogs từ file: {filename}")
                 except Exception as e:
-                    print(f"❌ Lỗi load file cogs/{filename}: {e}")
+                    print(f"❌ Lỗi load file cogs_shared/{filename}: {e}")
                     
     # Ép buộc đồng bộ sau khi đã load đầy đủ toàn bộ lệnh từ extension/cogs
     try:
