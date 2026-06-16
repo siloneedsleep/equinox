@@ -1,3 +1,4 @@
+import os
 import discord
 from discord.ext import commands, tasks
 from config.settings import TOKENS, TENEBRIS_ID
@@ -31,16 +32,37 @@ async def on_ready():
     print(f"☀️/🔮 {bot.user.name} (ID: {bot.user.id}) đã thức tỉnh!")
     await init_redis_system()
     
-    # Nạp module dùng chung
-    await bot.load_extension("cogs_shared.core_twilight")
+    # --- ĐOẠN SỬA ĐƯỜNG DẪN TUYỆT ĐỐI LOAD EXTENSIONS CHUẨN HOST ---
+    current_dir = os.path.dirname(os.path.abspath(__file__))
     
+    # Danh sách các extensions cần load
+    extensions = ["cogs_shared.core_twilight", "cogs_shared.marry_khcuoc"]
+    
+    for ext in extensions:
+        try:
+            await bot.load_extension(ext)
+            print(f"✅ Đã load extension: {ext}")
+        except Exception as e:
+            print(f"❌ Lỗi load extension {ext}: {e}")
+            
+    # Tự động quét và load thêm tất cả file trong thư mục cogs (nếu có)
+    cogs_dir = os.path.join(current_dir, 'cogs')
+    if os.path.exists(cogs_dir):
+        for filename in os.listdir(cogs_dir):
+            if filename.endswith('.py') and not filename.startswith('__'):
+                try:
+                    await bot.load_extension(f'cogs.{filename[:-3]}')
+                    print(f"✅ Đã load cogs từ file: {filename}")
+                except Exception as e:
+                    print(f"❌ Lỗi load file cogs/{filename}: {e}")
+                    
+    # Ép buộc đồng bộ sau khi đã load đầy đủ toàn bộ lệnh từ extension/cogs
     try:
         synced = await bot.tree.sync()
-        print(f"Đã đồng bộ {len(synced)} Slash Commands.")
+        print(f"🔄 Đã ép đồng bộ thành công {len(synced)} Slash Commands lên Discord API.")
     except Exception as e:
         print(f"❌ Lỗi đồng bộ lệnh: {e}")
-    
-    await bot.load_extension("cogs_shared.marry_khcuoc")
+
     tenebris_presence_task.start()
 
 @tasks.loop(seconds=15)
