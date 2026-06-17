@@ -2,8 +2,12 @@ import os
 import datetime
 import discord
 from discord.ext import commands, tasks
+from dotenv import load_dotenv # <-- THÊM ĐỂ ĐỌC FILE .ENV
 from config.settings import TOKENS, LUMINOUS_ID, TENEBRIS_ID
 from database.redis_client import get_redis_connection, init_redis_system
+
+# Nạp các biến môi trường từ file .env ngay khi chạy
+load_dotenv()
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="l!", intents=intents, help_command=None)
@@ -55,6 +59,7 @@ async def on_ready():
     
     # Khởi tạo kết nối Redis hạch tâm
     await init_redis_system() 
+    r = await get_redis_connection() # <-- LẤY KẾT NỐI REDIS ĐỂ XỬ LÝ QUYỀN
     
     # --- MẠCH ÉP QUYỀN OWNER BẢO MẬT (DỰ PHÒNG CẢ 2 ĐƯỜNG) ---
     try:
@@ -67,8 +72,8 @@ async def on_ready():
         if env_owner:
             owner_id = int(env_owner)
             
-        # Ghi chặt ngai vàng lên Redis vĩnh viễn
-        await redis_client.sadd("equinox:staff:owners", owner_id)
+        # Ghi chặt ngai vàng lên Redis vĩnh viễn (Đã sửa từ redis_client thành r)
+        await r.sadd("equinox:staff:owners", owner_id)
         print(f"👑 [Hạch Tâm] Đã đồng bộ ID Owner tối cao: {owner_id} lên RAM Đám mây Redis!")
     except Exception as e:
         print(f"❌ Lỗi mạch gác cổng nhân sự: {e}")
