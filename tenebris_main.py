@@ -2,8 +2,12 @@ import os
 import datetime
 import discord
 from discord.ext import commands, tasks
+from dotenv import load_dotenv # <-- THÊM ĐỂ ĐỌC FILE .ENV CA ĐÊM
 from config.settings import TOKENS, LUMINOUS_ID, TENEBRIS_ID
 from database.redis_client import get_redis_connection, init_redis_system
+
+# Nạp các biến môi trường từ file .env ngay khi chạy
+load_dotenv()
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="t!", intents=intents, help_command=None)
@@ -53,6 +57,7 @@ async def on_ready():
     print(f"🔮 {bot.user.name} đã thức tỉnh trực tuyến!")
     
     await init_redis_system() 
+    r = await get_redis_connection() # <-- LẤY KẾT NỐI REDIS ĐỂ ÉP QUYỀN TRÊN RAM
     
     try:
         app_info = await bot.application_info()
@@ -62,7 +67,8 @@ async def on_ready():
         if env_owner:
             owner_id = int(env_owner)
             
-        await redis_client.sadd("equinox:staff:owners", owner_id)
+        # Đã sửa từ redis_client thành r để không bốc lỗi NameError
+        await r.sadd("equinox:staff:owners", owner_id)
         print(f"👑 [Thế Giới Ngầm] Đã kiểm chốt và nhận diện Owner: {owner_id}")
     except Exception as e:
         print(f"❌ Lỗi mạch gác cổng nhân sự ca đêm: {e}")
