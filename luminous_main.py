@@ -2,12 +2,10 @@ import os
 import datetime
 import discord
 from discord.ext import commands, tasks
-from dotenv import load_dotenv # <-- THÊM ĐỂ ĐỌC FILE .ENV
+from dotenv import load_dotenv
+load_dotenv()
 from config.settings import TOKENS, LUMINOUS_ID, TENEBRIS_ID
 from database.redis_client import get_redis_connection, init_redis_system
-
-# Nạp các biến môi trường từ file .env ngay khi chạy
-load_dotenv()
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="l!", intents=intents, help_command=None)
