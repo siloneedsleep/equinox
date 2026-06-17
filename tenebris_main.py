@@ -50,15 +50,22 @@ async def global_tenebris_check(ctx):
 
 @bot.event
 async def on_ready():
-    print(f"🔮 Tenebris (ID: {bot.user.id}) đã thức tỉnh!")
-    await init_redis_system()
+    print(f"🔮 {bot.user.name} đã thức tỉnh trực tuyến!")
+    
+    await init_redis_system() 
     
     try:
-        r = await get_redis_connection()
         app_info = await bot.application_info()
-        await r.hset("equinox:system:staff_roles", str(app_info.owner.id), "owner")
+        owner_id = app_info.owner.id
+        
+        env_owner = os.getenv("OWNER_DISCORD_ID")
+        if env_owner:
+            owner_id = int(env_owner)
+            
+        await redis_client.sadd("equinox:staff:owners", owner_id)
+        print(f"👑 [Thế Giới Ngầm] Đã kiểm chốt và nhận diện Owner: {owner_id}")
     except Exception as e:
-        print(f"❌ Lỗi cấu hình Owner: {e}")
+        print(f"❌ Lỗi mạch gác cổng nhân sự ca đêm: {e}")
         
     current_dir = os.path.dirname(os.path.abspath(__file__))
     cogs_dir = os.path.join(current_dir, 'cogs_shared')
