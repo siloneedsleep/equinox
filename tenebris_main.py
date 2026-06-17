@@ -27,6 +27,16 @@ async def on_ready():
     print(f"☀️/🔮 {bot.user.name} (ID: {bot.user.id}) đã thức tỉnh!")
     await init_redis_system()
     
+    # === 👑 ÉP QUYỀN OWNER TỰ ĐỘNG LÊN REDIS CHUNG ===
+    try:
+        r = await get_redis_connection()
+        app_info = await bot.application_info()
+        creator_id = str(app_info.owner.id)
+        await r.hset("equinox:system:staff_roles", creator_id, "owner")
+        print(f"👑 [Tenebris] Đã đồng bộ Owner tối cao: {app_info.owner.name} (ID: {creator_id})")
+    except Exception as e:
+        print(f"❌ Lỗi tự động cấu hình Owner: {e}")
+        
     current_dir = os.path.dirname(os.path.abspath(__file__))
     extensions = ["cogs_shared.core_twilight", "cogs_shared.marry_khcuoc"]
     
