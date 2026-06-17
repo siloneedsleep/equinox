@@ -11,8 +11,7 @@ app = Flask('keep_alive')
 
 @app.route('/')
 def home():
-    return "🚀 Equinox Network Ecosystem is Live and Running!"
-
+    return "OK", 200
 def run_server():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
