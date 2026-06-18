@@ -1,19 +1,28 @@
 import os
-import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
 from database.redis_client import get_redis_connection
 
 # ==============================================================================
-# 🔘 DISCORD VIEW: GIAO DIỆN NÚT BẤM BÌNH CHỌN
+# 🔘 DISCORD VIEW: GIAO DIỆN NÚT BẤM BÌNH CHỌN (ĐÃ FIX LỖI TIME OUT)
 # ==============================================================================
 class VotingButtons(discord.ui.View):
-    def __init__(self, vote_id: str, opt1: str, opt2: str, opt3: str, timeout: int):
+    def __init__(self, bot, vote_id: str, opt1: str, opt2: str, opt3: str, timeout: int, channel, ping_role=None, ping_user=None, author_name=""):
+        # Gán timeout trực tiếp cho View xử lý tự động
         super().__init__(timeout=timeout)
+        self.bot = bot
         self.vote_id = vote_id
-        
-        # Đổi nhãn nút bấm theo tham số tính năng truyền vào
+        self.opt1 = opt1
+        self.opt2 = opt2
+        self.opt3 = opt3
+        self.channel = channel
+        self.ping_role = ping_role
+        self.ping_user = ping_user
+        self.author_name = author_name
+        self.message = None # Sẽ gán sau khi gửi tin nhắn thành công
+
+        # Đổi nhãn nút bấm theo tham số truyền vào
         self.button_a.label = opt1
         self.button_b.label = opt2
         self.button_c.label = opt3
@@ -22,7 +31,7 @@ class VotingButtons(discord.ui.View):
         r = await get_redis_connection()
         user_id = str(interaction.user.id)
         
-        # Check xem thanh niên này đã vote kèo này chưa
+        # Check xem user đã vote kèo này chưa
         has_voted = await r.hexists(f"equinox:vote:user_choices:{self.vote_id}", user_id)
         if has_voted:
             current_vote = await r.hget(f"equinox:vote:user_choices:{self.vote_id}", user_id)
@@ -49,6 +58,61 @@ class VotingButtons(discord.ui.View):
     async def button_c(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._handle_vote(interaction, "3", button.label)
 
+    # 📊 KHI HẾT GIỜ (TIMEOUT): Sự kiện tự động kích hoạt cực kỳ chính xác của Discord.py
+    async def on_timeout(self):
+        r = await get_redis_connection()
+
+        # Khóa toàn bộ nút bấm trên Embed gốc
+        for child in self.children:
+            child.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except Exception:
+                pass
+
+        # Bốc kết quả cuối cùng từ RAM Redis lên xử lý dữ liệu
+        counts = await r.hgetall(f"equinox:vote:counters:{self.vote_id}")
+        v1 = int(counts.get(b"1", b"0").decode('utf-8'))
+        v2 = int(counts.get(b"2", b"0").decode('utf-8'))
+        v3 = int(counts.get(b"3", b"0").decode('utf-8'))
+        total_votes = v1 + v2 + v3
+
+        # Phân tích xem ai thắng kèo
+        results = [(v1, self.opt1), (v2, self.opt2), (v3, self.opt3)]
+        results.sort(reverse=True, key=lambda x: x[0]) # Xếp hạng số phiếu cao nhất lên đầu
+        
+        winner_text = f"🏆 **Tính năng chiến thắng:** `{results[0][1]}` với `{results[0][0]}` phiếu bầu!" if total_votes > 0 else "❌ Không có ai thèm bỏ phiếu bầu nào hết!"
+
+        # Tạo Embed công bố kết quả chung cuộc
+        result_embed = discord.Embed(
+            title="📊 KẾT QUẢ CUỘC TRƯNG CẦU DÂN Ý 📊",
+            description=f"Cổng bình chọn mã số `#{self.vote_id[-6:]}` chính thức đóng cửa!\n\n"
+                        f"🥇 **Hạng 1:** `{results[0][1]}` — `{results[0][0]}` phiếu\n"
+                        f"🥈 **Hạng 2:** `{results[1][1]}` — `{results[1][0]}` phiếu\n"
+                        f"🥉 **Hạng 3:** `{results[2][1]}` — `{results[2][0]}` phiếu\n\n"
+                        f"🏁 {winner_text}",
+            color=0xFFD700
+        )
+        result_embed.set_footer(text=f"Tổng số phiếu đã ghi nhận trên hệ thống: {total_votes} lượt. Mở bởi: {self.author_name}")
+
+        # Xử lý chuỗi dữ liệu PING theo yêu cầu setup ban đầu của sếp
+        ping_string = ""
+        if self.ping_role:
+            ping_string += f" {self.ping_role.mention}"
+        if self.ping_user:
+            ping_string += f" {self.ping_user.mention}"
+
+        # Bắn kết quả kèm lệnh PING chuẩn chỉ vào thẳng kênh gõ lệnh
+        try:
+            await self.channel.send(content=ping_string if ping_string else None, embed=result_embed)
+        except Exception:
+            pass
+
+        # Dọn dẹp dữ liệu rác trên Redis để tiết kiệm RAM đám mây
+        await r.delete(f"equinox:vote:counters:{self.vote_id}")
+        await r.delete(f"equinox:vote:user_choices:{self.vote_id}")
+
 
 # ==============================================================================
 # 📊 COG SYSTEM: QUẢN LÝ LỆNH BÌNH CHỌN PHÂN QUYỀN
@@ -57,9 +121,6 @@ class FeatureVoter(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    # ==============================================================================
-    # 🗳️ LỆNH SLASH: MỞ BÌNH CHỌN (EVENT MANAGER & STAFF)
-    # ==============================================================================
     @app_commands.command(name="vote-feature", description="[STAFF / EVENT] Mở cuộc trưng cầu dân ý bình chọn tính năng mới cho Server")
     @app_commands.describe(
         tinh_nang_1="Tên tính năng lựa chọn 1",
@@ -98,10 +159,10 @@ class FeatureVoter(commands.Cog):
         cycle_bytes = await r.hget("equinox:system:config", "current_cycle")
         cycle = cycle_bytes.decode('utf-8') if cycle_bytes else "DAY"
         
-        # Khởi tạo ID cuộc bình chọn độc bản dựa trên timestamp
+        # Khởi tạo ID cuộc bình chọn dựa trên timestamp
         vote_id = f"{interaction.guild.id}:{int(interaction.created_at.timestamp())}"
         
-        # Khởi tạo sẵn bộ đếm 0 phiếu trên Redis cho 3 option
+        # Khởi tạo bộ đếm 0 phiếu trên Redis cho 3 option
         await r.hset(f"equinox:vote:counters:{vote_id}", mapping={"1": "0", "2": "0", "3": "0"})
 
         # Đóng gói giao diện biểu thị hạch tâm cuộc gọi bình chọn
@@ -117,65 +178,28 @@ class FeatureVoter(commands.Cog):
         embed.add_field(name="⏱️ Thời hạn đóng hộc thư", value=f"Sẽ tự động kết thúc sau `{so_phut}` phút.", inline=False)
         embed.set_footer(text=f"Mở bởi điều hành viên: {interaction.user.display_name}")
 
-        # Khởi tạo nút bấm đính kèm View
+        # Tính số giây timeout
         timeout_seconds = so_phut * 60
-        view = VotingButtons(vote_id, tinh_nang_1, tinh_nang_2, tinh_nang_3, timeout_seconds)
+        
+        # Khởi tạo View nút bấm, truyền toàn bộ bối cảnh qua View để on_timeout tự bốc xử lý
+        view = VotingButtons(
+            bot=self.bot,
+            vote_id=vote_id,
+            opt1=tinh_nang_1,
+            opt2=tinh_nang_2,
+            opt3=tinh_nang_3,
+            timeout=timeout_seconds,
+            channel=interaction.channel,
+            ping_role=ping_role,
+            ping_user=ping_user,
+            author_name=interaction.user.display_name
+        )
 
         # Bắn Embed bình chọn ra sảnh chat
         await interaction.response.send_message(embed=embed, view=view)
         
-        # Bốc tin nhắn phản hồi gốc để chuẩn bị sửa hoặc theo dõi mạch khóa
-        initial_msg = await interaction.original_response()
-
-        # ⏳ MẠCH ĐẾM NGƯỢC CHẠY NGẦM ĐỂ PING BÁO KẾT QUẢ ĐÚNG GIỜ
-        await asyncio.sleep(timeout_seconds)
-
-        # 📊 KHI HẾT GIỜ: Bốc kết quả cuối cùng từ RAM Redis lên xử lý dữ liệu
-        counts = await r.hgetall(f"equinox:vote:counters:{vote_id}")
-        v1 = int(counts.get(b"1", b"0").decode('utf-8'))
-        v2 = int(counts.get(b"2", b"0").decode('utf-8'))
-        v3 = int(counts.get(b"3", b"0").decode('utf-8'))
-        total_votes = v1 + v2 + v3
-
-        # Khóa nút bấm trên tin nhắn gốc
-        for child in view.children:
-            child.disabled = True
-        try:
-            await initial_msg.edit(view=view)
-        except Exception:
-            pass
-
-        # Phân tích xem ai thắng kèo
-        results = [(v1, tinh_nang_1), (v2, tinh_nang_2), (v3, tinh_nang_3)]
-        results.sort(reverse=True, key=lambda x: x[0]) # Xếp hạng số phiếu cao nhất lên đầu
-        
-        winner_text = f"🏆 **Tính năng chiến thắng:** `{results[0][1]}` với `{results[0][0]}` phiếu bầu!" if total_votes > 0 else "❌ Không có ai thèm bỏ phiếu bầu nào hết!"
-
-        # Tạo Embed công bố kết quả chung cuộc
-        result_embed = discord.Embed(
-            title="📊 KẾT QUẢ CUỘC TRƯNG CẦU DÂN Ý 📊",
-            description=f"Cổng bình chọn mã số `#{vote_id[-6:]}` chính thức đóng cửa!\n\n"
-                        f"🥇 **Hạng 1:** `{results[0][1]}` — `{results[0][0]}` phiếu\n"
-                        f"🥈 **Hạng 2:** `{results[1][1]}` — `{results[1][0]}` phiếu\n"
-                        f"🥉 **Hạng 3:** `{results[2][1]}` — `{results[2][2 if len(results)>2 else 0][0]}` phiếu\n\n"
-                        f"🏁 {winner_text}",
-            color=0xFFD700
-        )
-        result_embed.set_footer(text=f"Tổng số phiếu đã ghi nhận trên hệ thống: {total_votes} lượt.")
-
-        # Xử lý chuỗi dữ liệu PING theo yêu cầu setup ban đầu của sếp
-        ping_string = ""
-        if ping_role:
-            ping_string += f" {ping_role.mention}"
-        if ping_user:
-            ping_string += f" {ping_user.mention}"
-
-        # Bắn kết quả kèm lệnh PING chuẩn chỉ vào thẳng kênh gõ lệnh ban đầu
-        await interaction.channel.send(content=ping_string if ping_string else None, embed=result_embed)
-
-        # Dọn dẹp rác dữ liệu trên Redis để tiết kiệm dung lượng RAM đám mây
-        await r.delete(f"equinox:vote:counters:{vote_id}")
-        await r.delete(f"equinox:vote:user_choices:{vote_id}")
+        # Gán ngược message vừa tạo vào view để sau này on_timeout lôi ra sửa giao diện (khóa nút)
+        view.message = await interaction.original_response()
 
 async def setup(bot):
     await bot.add_cog(FeatureVoter(bot))
