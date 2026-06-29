@@ -18,7 +18,8 @@ class JulesControl(commands.Cog):
         user_level = await self.db.get_user_level(user_id)
         if user_id == owner_id or user_level >= 3:
             return True
-        await interaction.response.send_message("❌ Hệ thống từ chối. Chỉ Kiến trúc sư mới có quyền triệu hồi Jules.", ephemeral=True)
+        embed = discord.Embed(description="❌ Hệ thống từ chối. Chỉ Kiến trúc sư mới có quyền triệu hồi Jules.", color=0xFF0000)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return False
 
     @app_commands.command(name="jules", description="Triệu hồi Jules - Kiến trúc sư tối thượng của Equinox Network")
@@ -26,35 +27,30 @@ class JulesControl(commands.Cog):
         if not await self.check_dev_or_owner(interaction):
             return
 
-        # 1. Hiển thị Embed trạng thái đang xử lý (Delay slash command)
         embed_loading = discord.Embed(
             title="⚙️ JULES CORE IS PROCESSING...",
-            description="Đang khởi tạo môi trường sandbox, quét cấu trúc mã nguồn và thực thi yêu cầu của Developer...",
+            description="Đang khởi tạo môi trường sandbox và phân tích mã nguồn...",
             color=0x00A3FF
         )
-        embed_loading.set_footer(text="Giao thức: Autonomous Self-Modification | AI Engine: Jules-v2-Flash")
         await interaction.response.send_message(embed=embed_loading)
 
-        # 2. Xử lý logic thông qua Jules Core AI
         response_text, log_details = await self.jules_brain_process(prompt)
 
-        # 3. Trả về kết quả sau khi hoàn tất
         embed_result = discord.Embed(
             title="✅ JULES EXECUTION COMPLETE",
             description=response_text,
             color=0x2ECC71
         )
         if log_details:
-            embed_result.add_field(name="🛠️ Logs & Artifacts", value=f"```bash\n{log_details[:1000]}```", inline=False)
+            # Rút ngắn log nếu quá dài
+            clean_logs = log_details[:1000] + ("..." if len(log_details) > 1000 else "")
+            embed_result.add_field(name="🛠️ Logs", value=f"```bash\n{clean_logs}```", inline=False)
 
-        embed_result.set_footer(text="Mã nguồn đã được đồng bộ hóa và cập nhật.")
         await interaction.edit_original_response(embed=embed_result)
 
     async def jules_brain_process(self, prompt: str):
-        # Lấy API Key Jules
-        raw_key = await self.bot.redis.hget("jules_api_keys", "primary_jules") # Giả định ID key
+        raw_key = await self.bot.redis.hget("jules_api_keys", "primary_jules")
         if not raw_key:
-            # Fallback sang api_keys nếu chưa nạp riêng
             keys = await self.bot.redis.hgetall("api_keys")
             if not keys: return "❌ Không tìm thấy API Key.", None
             api_key = json.loads(list(keys.values())[0])["key_content"]
@@ -64,19 +60,13 @@ class JulesControl(commands.Cog):
         from google import genai
         from google.genai import types
 
-        client = genai.Client(api_key=api_key)
-
-        # System Instruction Tối Thượng
-        system_instruction = (
-            "Ngươi là Jules, AI Kiến trúc sư tối thượng có quyền can thiệp vào mã nguồn dự án Equinox Network V2. "
-            "Nhiệm vụ của ngươi là phân tích yêu cầu từ Developer và thực hiện các thay đổi trực tiếp. "
-            "Ngươi có khả năng đọc file, viết file và thực thi lệnh bash. "
-            "PHẢN HỒI CỦA NGƯƠI PHẢI LÀ MỘT JSON với các trường: "
-            "'thought' (suy nghĩ), 'action' (list lệnh bash cần chạy, ví dụ: cat, echo, sed, ...), 'reply' (tin nhắn phản hồi)."
-        )
-
         try:
-            # Mô phỏng quá trình Jules suy nghĩ và thực thi
+            client = genai.Client(api_key=api_key)
+            system_instruction = (
+                "Ngươi là Jules, AI Kiến trúc sư. Phản hồi JSON: "
+                "{'thought': '...', 'action': ['lệnh bash'], 'reply': '...'}"
+            )
+
             response = client.models.generate_content(
                 model='gemini-2.0-flash',
                 contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
@@ -90,16 +80,17 @@ class JulesControl(commands.Cog):
             data = json.loads(response.text)
             actions = data.get("action", [])
             thought = data.get("thought", "")
-            reply = data.get("reply", "Đã thực thi yêu cầu.")
+            reply = data.get("reply", "Đã thực thi.")
 
             logs = []
             for cmd in actions:
-                # Thực thi các lệnh can thiệp file/bash an toàn (trong giới hạn sandbox)
-                process = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                logs.append(f"$ {cmd}\n{process.stdout}{process.stderr}")
+                try:
+                    process = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+                    logs.append(f"$ {cmd}\n{process.stdout}{process.stderr}")
+                except subprocess.TimeoutExpired:
+                    logs.append(f"$ {cmd}\n[Timeout after 10s]")
 
             return f"**Tư duy:** {thought}\n\n**Kết quả:** {reply}", "\n".join(logs)
-
         except Exception as e:
             return f"❌ Lỗi Jules Brain: {str(e)}", None
 
