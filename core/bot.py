@@ -76,10 +76,16 @@ class EquinoxBot(commands.Bot):
     async def handle_shift_change(self, active_persona: str):
         if self.persona == active_persona:
             self.is_active_shift = True
-            await self.change_presence(status=discord.Status.online, activity=discord.Game(name="Equinox Network V2 | Active"))
+            # Luminous: Online | Tenebris: Do Not Disturb (DND) cho ngầu
+            status = discord.Status.online if self.persona == "Luminous" else discord.Status.dnd
+            activity_name = "Equinox Network | Ca Ngày ☀️" if self.persona == "Luminous" else "Equinox Network | Ca Đêm 🌙"
+
+            await self.change_presence(status=status, activity=discord.Activity(type=discord.ActivityType.watching, name=activity_name))
+            print(f"[{self.bot_name}] Đã vào ca trực. Trạng thái: {status}")
         else:
             self.is_active_shift = False
             await self.change_presence(status=discord.Status.invisible)
+            print(f"[{self.bot_name}] Đã hết ca trực. Trạng thái: Invisible")
 
     async def on_ready(self):
         print(f"[{self.bot_name}] Hệ thống Identity {self.user.name} đã sẵn sàng.")
