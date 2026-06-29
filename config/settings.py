@@ -7,9 +7,17 @@ load_dotenv()
 
 def get_config():
     # Thử đọc từ config.json trước (Tiện cho Pterodactyl File Manager)
-    if os.path.exists("config.json"):
-        with open("config.json", "r", encoding="utf-8") as f:
-            return json.load(f)
+    config_path = "config.json"
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                # Loại bỏ khoảng trắng thừa và xử lý lỗi ký tự điều khiển
+                return json.loads(content, strict=False)
+        except Exception as e:
+            print(f"[Warning] Lỗi định dạng config.json tại '{config_path}': {e}")
+            print("[System] Hệ thống sẽ chuyển sang sử dụng Biến môi trường (Environment Variables).")
+            return {}
     return {}
 
 _c = get_config()
@@ -27,8 +35,8 @@ TENEBRIS_CLIENT_SECRET = os.getenv("TENEBRIS_CLIENT_SECRET") or _c.get("tenebris
 OAUTH2_REDIRECT_URI = os.getenv("OAUTH2_REDIRECT_URI") or _c.get("oauth2_redirect_uri")
 
 # Infrastructure
-# Pterodactyl thường cấp SERVER_PORT
 REDIS_URI = os.getenv("REDIS_URI") or _c.get("redis_uri", "redis://localhost:6379")
+# Pterodactyl SERVER_PORT
 PORT = int(os.getenv("SERVER_PORT") or os.getenv("PORT") or _c.get("port", 8080))
 
 # System Configuration

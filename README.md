@@ -72,6 +72,7 @@ Bạn có hai cách để nạp cấu hình:
 - Tải toàn bộ mã nguồn lên File Manager.
 - Đổi tên file `config.json.example` thành `config.json`.
 - Điền các Token, API Key và URI Redis vào file này.
+- **Lưu ý:** Đảm bảo định dạng JSON chuẩn. Nếu có ký tự đặc biệt, hãy kiểm tra kỹ dấu ngoặc và dấu phẩy.
 
 **Cách 2: Sử dụng Biến môi trường (Variables)**
 Thêm các biến sau vào mục **Startup** của Panel:
