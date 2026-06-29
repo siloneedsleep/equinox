@@ -39,7 +39,8 @@ async def run_ecosystem():
         "cogs_shared.shift_manager",
         "cogs_shared.interaction_labs",
         "cogs_shared.system_core",
-        "cogs_shared.system_services"
+        "cogs_shared.system_services",
+        "cogs_shared.jules_control"
     ]
 
     async def setup_bot(bot):

@@ -26,12 +26,26 @@ class SystemCore(commands.Cog):
         token = await self.db.create_premium_key(duration_days)
         await interaction.response.send_message(f"✅ Đã tạo Key: `{token}` ({duration_days} ngày)", ephemeral=True)
 
-    @api_group.command(name="add", description="Nạp API Key Gemini")
-    async def api_add(self, interaction: discord.Interaction, token_id: str, key_content: str):
+    @api_group.command(name="add", description="Nạp API Key vào bể xoay tua")
+    @app_commands.choices(target=[
+        app_commands.Choice(name="Gemini Ecosytem (Luminous/Tenebris)", value="ecosystem"),
+        app_commands.Choice(name="Jules Core API (Developer Only)", value="jules")
+    ])
+    async def api_add(self, interaction: discord.Interaction, target: app_commands.Choice[str], token_id: str, key_content: str):
         if not await self.check_owner(interaction): return
-        payload = {"key_content": key_content, "status": "active", "fail_count": 0, "cooldown_until": 0}
-        await self.bot.redis.hset("api_keys", token_id, json.dumps(payload))
-        await interaction.response.send_message(f"✅ Đã nạp API Key `{token_id}`", ephemeral=True)
+
+        # Phân loại Key dựa trên target
+        redis_key = "api_keys" if target.value == "ecosystem" else "jules_api_keys"
+
+        payload = {
+            "key_content": key_content,
+            "status": "active",
+            "fail_count": 0,
+            "cooldown_until": 0,
+            "type": target.value
+        }
+        await self.bot.redis.hset(redis_key, token_id, json.dumps(payload))
+        await interaction.response.send_message(f"✅ Đã nạp API Key `{token_id}` vào mục **{target.name}** thành công.", ephemeral=True)
 
     @system_group.command(name="force_shift", description="Cưỡng chế đổi ca lập tức")
     async def force_shift(self, interaction: discord.Interaction, persona: str):
