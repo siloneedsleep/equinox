@@ -1,8 +1,10 @@
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 import json
 import datetime
 import pytz
+import os
 from config.settings import LUMINOUS_SHIFT_START, TENEBRIS_SHIFT_START
 
 class ShiftManager(commands.Cog):
@@ -53,7 +55,44 @@ class ShiftManager(commands.Cog):
             "timestamp": now.isoformat()
         }
         # Tự gửi cho chính mình và các bot khác qua Redis
+        try:
+            await self.bot.redis.publish("equinox_system", json.dumps(payload))
+        except: pass
+
+    @app_commands.command(name="doica", description="[Staff] Thực hiện đổi ca thủ công giữa các thực thể")
+    @app_commands.choices(persona=[
+        app_commands.Choice(name="Luminous (Ca Ngày)", value="Luminous"),
+        app_commands.Choice(name="Tenebris (Ca Đêm)", value="Tenebris")
+    ])
+    async def manual_shift_change(self, interaction: discord.Interaction, persona: app_commands.Choice[str]):
+        # Check quyền Staff (Level >= 1)
+        # Giả định Level quản lý qua Redis hget user:id level
+        user_level = await self.bot.redis.hget(f"user:{interaction.user.id}", "level")
+        user_level = int(user_level) if user_level else 0
+        owner_id = int(os.getenv("OWNER_ID", 0))
+
+        if user_level < 1 and interaction.user.id != owner_id:
+            embed = discord.Embed(description="❌ Bạn không có quyền thực hiện lệnh đổi ca.", color=0xFF0000)
+            return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        payload = {
+            "action": "shift_change",
+            "active_persona": persona.value,
+            "timestamp": datetime.datetime.now(self.timezone).isoformat(),
+            "issuer": interaction.user.name
+        }
+
         await self.bot.redis.publish("equinox_system", json.dumps(payload))
+        # Lưu log đổi ca vào Redis
+        await self.bot.redis.lpush("shift_logs", json.dumps(payload))
+        await self.bot.redis.ltrim("shift_logs", 0, 99) # Giữ 100 log gần nhất
+
+        embed = discord.Embed(
+            title="🔄 XÁC NHẬN ĐỔI CA THỦ CÔNG",
+            description=f"Thực thể được kích hoạt: **{persona.name}**\nNgười thực hiện: {interaction.user.mention}",
+            color=0x00FF00
+        )
+        await interaction.response.send_message(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(ShiftManager(bot))

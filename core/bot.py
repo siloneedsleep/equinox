@@ -1,6 +1,9 @@
 import discord
 from discord.ext import commands
 import redis.asyncio as redis
+from redis.asyncio.retry import Retry
+from redis.backoff import ExponentialBackoff
+from redis.exceptions import ConnectionError, TimeoutError
 import json
 import asyncio
 from config.settings import REDIS_URI
@@ -22,13 +25,19 @@ class EquinoxBot(commands.Bot):
         self.is_active_shift = False
 
     async def setup_hook(self):
-        # Kết nối Redis thuần với cơ chế tự động reconnect
+        # Cấu hình chiến lược Retry
+        retry_strategy = Retry(ExponentialBackoff(), 5)
+
+        # Kết nối Redis thuần với cơ chế ổn định cao cho Valkey/Aiven
         self.redis = redis.from_url(
             REDIS_URI,
             decode_responses=True,
+            retry=retry_strategy,
             retry_on_timeout=True,
-            health_check_interval=30,
-            socket_connect_timeout=10
+            socket_keepalive=True,
+            health_check_interval=15,
+            socket_timeout=30.0,
+            socket_connect_timeout=15
         )
         self.pubsub = self.redis.pubsub()
 
@@ -44,20 +53,25 @@ class EquinoxBot(commands.Bot):
             try:
                 async for message in self.pubsub.listen():
                     if message["type"] == "message":
-                        data = json.loads(message["data"])
-                        if data.get("action") == "shift_change":
-                            await self.handle_shift_change(data.get("active_persona"))
-                        self.dispatch("system_event", data)
-            except redis.ConnectionError:
-                print(f"[{self.bot_name}] Mất kết nối Redis. Đang thử kết nối lại sau 5 giây...")
+                        try:
+                            data = json.loads(message["data"])
+                            if data.get("action") == "shift_change":
+                                await self.handle_shift_change(data.get("active_persona"))
+                            self.dispatch("system_event", data)
+                        except json.JSONDecodeError:
+                            continue
+            except (ConnectionError, TimeoutError, asyncio.TimeoutError) as e:
+                print(f"[{self.bot_name}] Mất kết nối hoặc Timeout Redis ({type(e).__name__}). Đang thử kết nối lại...")
                 await asyncio.sleep(5)
-                # Tự động subscribe lại sau khi reconnect
                 try:
+                    # Đảm bảo pubsub cũ được đóng và tạo cái mới nếu cần
                     await self.pubsub.subscribe("equinox_system")
-                except: pass
+                    print(f"[{self.bot_name}] Đã tái kết nối và re-subscribe thành công.")
+                except Exception as resub_err:
+                    print(f"[{self.bot_name}] Re-subscribe thất bại: {resub_err}")
             except Exception as e:
                 print(f"[{self.bot_name}] Pub/Sub Listener Error: {e}")
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
 
     async def handle_shift_change(self, active_persona: str):
         if self.persona == active_persona:
@@ -66,6 +80,23 @@ class EquinoxBot(commands.Bot):
         else:
             self.is_active_shift = False
             await self.change_presence(status=discord.Status.invisible)
+
+    async def on_ready(self):
+        print(f"[{self.bot_name}] Hệ thống Identity {self.user.name} đã sẵn sàng.")
+
+        # Tự động đồng bộ Slash Commands
+        try:
+            from config.settings import MAIN_GUILD_ID
+            if MAIN_GUILD_ID:
+                guild = discord.Object(id=MAIN_GUILD_ID)
+                self.tree.copy_global_to(guild=guild)
+                synced = await self.tree.sync(guild=guild)
+                print(f"[{self.bot_name}] Đã đồng bộ {len(synced)} lệnh Slash tới Guild {MAIN_GUILD_ID}")
+            else:
+                synced = await self.tree.sync()
+                print(f"[{self.bot_name}] Đã đồng bộ {len(synced)} lệnh Slash toàn cầu.")
+        except Exception as e:
+            print(f"[{self.bot_name}] Lỗi đồng bộ Slash Commands: {e}")
 
     async def close(self):
         if self.pubsub:
