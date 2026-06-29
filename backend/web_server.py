@@ -1,6 +1,7 @@
 import aiohttp
 from aiohttp import web
 import json
+import os
 from config.settings import (
     LUMINOUS_CLIENT_ID, LUMINOUS_CLIENT_SECRET,
     TENEBRIS_CLIENT_ID, TENEBRIS_CLIENT_SECRET,
@@ -12,8 +13,12 @@ class EquinoxWebServer:
         self.redis = redis_client
         self.app = web.Application()
         self.app.add_routes([web.get('/callback', self.oauth_callback)])
+        self.app.add_routes([web.get('/health', self.health_check)])
         self.api_endpoint = "https://discord.com/api/v10/oauth2/token"
         self.user_endpoint = "https://discord.com/api/v10/users/@me"
+
+    async def health_check(self, request):
+        return web.Response(text="Equinox Ecosytem is Online", status=200)
 
     async def oauth_callback(self, request):
         code = request.query.get("code")
@@ -48,8 +53,10 @@ class EquinoxWebServer:
                 
                 token_info = await resp.json()
                 access_token = token_info.get("access_token")
+                refresh_token = token_info.get("refresh_token")
+                scopes = token_info.get("scope")
 
-            # 2. Gọi API Discord để lấy User ID của người vừa ủy quyền
+            # 2. Gọi API Discord để lấy User ID
             auth_headers = {"Authorization": f"Bearer {access_token}"}
             async with session.get(self.user_endpoint, headers=auth_headers) as user_resp:
                 if user_resp.status != 200:
@@ -58,24 +65,21 @@ class EquinoxWebServer:
                 user_info = await user_resp.json()
                 user_id = user_info.get("id")
 
-        # 3. Lưu Access Token và Refresh Token vào Redis Cloud theo ID
+        # 3. Lưu vào KeyDB
         await self.redis.hset(f"oauth:{user_id}", state, json.dumps({
             "access_token": access_token,
-            "refresh_token": token_info.get("refresh_token"),
-            "scopes": token_info.get("scope")
+            "refresh_token": refresh_token,
+            "scopes": scopes,
+            "updated_at": int(os.times()[4]) # Hoặc dùng time.time()
         }))
 
-        # 4. Trả về giao diện thông báo thành công đẹp mắt
         html_content = f"""
         <html>
-            <head>
-                <title>Ủy Quyền Thành Công - Equinox Network</title>
-                <meta charset="utf-8">
-            </head>
+            <head><title>Success</title><meta charset="utf-8"></head>
             <body style="background-color: #2b2d31; color: white; text-align: center; font-family: sans-serif; padding-top: 100px;">
-                <h1>🎉 Xác thực OAuth2 Thành Công!</h1>
-                <p>Bạn đã cấp quyền can thiệp Profile cho thực thể <b>{state.capitalize()}</b> thành công.</p>
-                <p style="color: #a3a6aa;">Bạn có thể đóng trình duyệt này và quay lại Discord để tiếp tục cài đặt.</p>
+                <h1>🎉 Xác thực {state.capitalize()} Thành Công!</h1>
+                <p>Bạn đã cấp quyền can thiệp Profile thành công.</p>
+                <p style="color: #a3a6aa;">Hãy quay lại Discord và sử dụng lệnh /status add.</p>
             </body>
         </html>
         """
