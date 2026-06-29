@@ -25,13 +25,20 @@ class EquinoxEcosystem:
         print("="*50)
 
         # 1. Khởi tạo Redis với cơ chế retry
-        try:
-            self.redis_client = redis.from_url(REDIS_URI, decode_responses=True)
-            await self.redis_client.ping()
-            print("[System] Kết nối KeyDB/Redis thành công.")
-        except Exception as e:
-            print(f"[Critical] Không thể kết nối Redis: {e}")
-            sys.exit(1)
+        retry_count = 0
+        while retry_count < 5:
+            try:
+                self.redis_client = redis.from_url(REDIS_URI, decode_responses=True)
+                await self.redis_client.ping()
+                print("[System] Kết nối Redis thành công.")
+                break
+            except Exception as e:
+                retry_count += 1
+                print(f"[Warning] Thử kết nối Redis lần {retry_count}/5 thất bại: {e}")
+                if retry_count == 5:
+                    print("[Critical] KHÔNG THỂ KẾT NỐI REDIS. Vui lòng kiểm tra lại REDIS_URI trong config.json.")
+                    sys.exit(1)
+                await asyncio.sleep(5)
 
         # 2. Khởi tạo Bots
         self.luminous = EquinoxBot("Luminous", "l!", COLOR_LUMINOUS, "Luminous")

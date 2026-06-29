@@ -22,12 +22,13 @@ class EquinoxBot(commands.Bot):
         self.is_active_shift = False
 
     async def setup_hook(self):
-        # Kết nối Redis với cơ chế tự động reconnect
+        # Kết nối Redis thuần với cơ chế tự động reconnect
         self.redis = redis.from_url(
             REDIS_URI,
             decode_responses=True,
             retry_on_timeout=True,
-            health_check_interval=30
+            health_check_interval=30,
+            socket_connect_timeout=10
         )
         self.pubsub = self.redis.pubsub()
 

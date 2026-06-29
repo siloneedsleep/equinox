@@ -63,7 +63,7 @@ Hệ thống tự động hoán đổi trạng thái giữa hai bot theo thời 
 
 ### 1. Yêu cầu hệ thống
 - Python 3.10+
-- Redis hoặc KeyDB bên ngoài (External Database).
+- **Redis thuần** (Bạn có thể dùng Redis từ tab *Databases* trên Panel hoặc dịch vụ Redis Cloud miễn phí).
 
 ### 2. Cấu hình trên Pterodactyl Panel
 Bạn có hai cách để nạp cấu hình:
@@ -77,7 +77,7 @@ Bạn có hai cách để nạp cấu hình:
 **Cách 2: Sử dụng Biến môi trường (Variables)**
 Thêm các biến sau vào mục **Startup** của Panel:
 - `LUMINOUS_TOKEN`, `TENEBRIS_TOKEN`
-- `REDIS_URI`
+- `REDIS_URI`: Ví dụ `redis://:password@host:port`
 - `OWNER_ID`
 - `SERVER_PORT`: Bot sẽ tự động bắt port này.
 
