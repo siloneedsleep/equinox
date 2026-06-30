@@ -3,7 +3,6 @@ from discord.ext import commands
 from discord import app_commands
 import os
 import json
-import asyncio
 import subprocess
 from backend.database import EquinoxDatabase
 

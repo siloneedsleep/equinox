@@ -1,8 +1,6 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import json
-import os
 from backend.database import EquinoxDatabase
 from config.settings import DEFAULT_MAIN_SERVER_LINK, OWNER_ID
 

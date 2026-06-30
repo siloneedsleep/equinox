@@ -1,10 +1,8 @@
-import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import json
 import datetime
 import pytz
-import os
 from config.settings import OWNER_ID
 
 class ShiftManager(commands.Cog):

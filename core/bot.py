@@ -79,7 +79,7 @@ class EquinoxBot(commands.Bot):
                             self.dispatch("system_event", data)
                         except json.JSONDecodeError:
                             continue
-            except (ConnectionError, TimeoutError, asyncio.TimeoutError) as e:
+            except (ConnectionError, TimeoutError, asyncio.TimeoutError):
                 print(f"[{self.bot_name}] Mất kết nối Redis trong Pub/Sub. Đang thử lại...")
                 await asyncio.sleep(5)
                 try:

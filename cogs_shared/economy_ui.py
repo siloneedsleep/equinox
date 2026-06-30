@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands
 from backend.database import EquinoxDatabase
 from backend.economy_engine import EconomyEngine
-import json
 
 class EconomyUI(commands.Cog):
     def __init__(self, bot):
