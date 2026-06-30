@@ -13,6 +13,7 @@ TENEBRIS_CLIENT_SECRET = os.environ.get("TENEBRIS_CLIENT_SECRET")
 OAUTH2_REDIRECT_URI = os.environ.get("OAUTH2_REDIRECT_URI")
 REDIS_URI = os.environ.get("REDIS_URI")
 
+
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         from urllib.parse import urlparse, parse_qs
@@ -86,3 +87,6 @@ class handler(BaseHTTPRequestHandler):
             self.send_response(500)
             self.end_headers()
             self.wfile.write(f"❌ Lỗi hệ thống: {str(e)}".encode())
+
+# Vercel requires the entrypoint object to be named "app"
+app = handler

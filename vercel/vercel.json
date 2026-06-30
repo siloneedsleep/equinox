@@ -1,5 +1,14 @@
 {
-  "rewrites": [
-    { "source": "/callback", "destination": "/api/callback" }
+  "builds": [
+    {
+      "src": "api/callback.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/callback",
+      "dest": "/api/callback.py"
+    }
   ]
 }
