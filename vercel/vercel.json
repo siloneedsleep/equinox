@@ -1,5 +1,8 @@
 {
   "rewrites": [
-    { "source": "/callback", "destination": "/api/callback" }
+    {
+      "source": "/callback",
+      "destination": "/api/callback"
+    }
   ]
 }

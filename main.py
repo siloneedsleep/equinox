@@ -7,7 +7,7 @@ from backend.web_server import EquinoxWebServer
 from backend.presence_proxy import ProxyPresenceManager
 from config.settings import (
     LUMINOUS_TOKEN, TENEBRIS_TOKEN, QUANGIA_TOKEN, REDIS_URI,
-    COLOR_LUMINOUS, COLOR_TENEBRIS
+    COLOR_LUMINOUS, COLOR_TENEBRIS, OAUTH2_REDIRECT_URI
 )
 
 class EquinoxEcosystem:

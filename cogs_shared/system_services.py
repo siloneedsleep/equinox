@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-import os
 from backend.database import EquinoxDatabase
 from config.settings import OWNER_ID
 
