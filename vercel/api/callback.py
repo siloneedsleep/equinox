@@ -4,6 +4,7 @@ import os
 import requests
 import time
 import redis
+from urllib.parse import urlparse, parse_qs
 
 # Cấu hình từ Vercel Environment Variables
 LUMINOUS_CLIENT_ID = os.environ.get("LUMINOUS_CLIENT_ID")
@@ -16,15 +17,17 @@ REDIS_URI = os.environ.get("REDIS_URI")
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        from urllib.parse import urlparse, parse_qs
-        query = parse_qs(urlparse(self.path).query)
+        parsed_url = urlparse(self.path)
+        query = parse_qs(parsed_url.query)
+
         code = query.get("code", [None])[0]
         state = query.get("state", ["luminous"])[0]
 
         if not code:
             self.send_response(400)
+            self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
-            self.wfile.write("❌ Lỗi: Thiếu mã code.".encode())
+            self.wfile.write(f"❌ Lỗi: Thiếu mã code. (Path: {self.path})".encode())
             return
 
         # Phân loại Bot
@@ -85,8 +88,8 @@ class handler(BaseHTTPRequestHandler):
 
         except Exception as e:
             self.send_response(500)
+            self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
             self.wfile.write(f"❌ Lỗi hệ thống: {str(e)}".encode())
 
 # Vercel requires the entrypoint object to be named 'handler' natively
-# if we do not use an explicit 'builds' configuration
