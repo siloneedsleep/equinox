@@ -91,5 +91,3 @@ class handler(BaseHTTPRequestHandler):
             self.send_header('Content-type', 'text/html; charset=utf-8')
             self.end_headers()
             self.wfile.write(f"❌ Lỗi hệ thống: {str(e)}".encode())
-
-# Vercel requires the entrypoint object to be named 'handler' natively
