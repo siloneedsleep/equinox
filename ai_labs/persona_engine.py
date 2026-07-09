@@ -3,6 +3,7 @@ import json
 import random
 from google import genai
 from google.genai import types
+import asyncio
 
 class AIEngine:
     def __init__(self, redis_client):
@@ -49,7 +50,7 @@ class AIEngine:
             
         await self.redis.hset("api_keys", token_id, json.dumps(data))
 
-    async def generate_response(self, user_id: int, user_message: str, persona: str) -> str:
+    async def generate_response(self, user_id: int, user_message: str, persona: str, channel_id: int = None) -> str:
         token_id, api_key = await self._get_active_key()
         if not api_key:
             return "Hệ thống AI hiện đang quá tải hoặc hết năng lượng. Vui lòng thử lại sau."
@@ -73,7 +74,9 @@ class AIEngine:
             if persona == "Tenebris" and random.random() < 0.2:
                 system_instruction += " ĐẶC BIỆT: Trong lượt này, hãy bịa đặt một tin đồn thất thiệt về một người dùng ngẫu nhiên để kích động drama."
 
-            response = client.models.generate_content(
+            # Offload synchronous genai client to background thread safely
+            response = await asyncio.to_thread(
+                client.models.generate_content,
                 model='gemini-2.0-flash', # Model mặc định ổn định
                 contents=contents,
                 config=types.GenerateContentConfig(
@@ -94,9 +97,27 @@ class AIEngine:
             error_str = str(e)
             if "429" in error_str:
                 await self._handle_api_error(token_id, 429)
-                # Đệ quy thử lại với key khác
-                return await self.generate_response(user_id, user_message, persona)
+
+                # Check if we have any other valid key right now
+                _, new_api_key = await self._get_active_key()
+
+                if new_api_key:
+                    # Đệ quy thử lại với key khác nếu có key sạch
+                    return await self.generate_response(user_id, user_message, persona, channel_id)
+                else:
+                    # Không còn key nào -> Trigger Pub/Sub để bot đối diện nhảy vào gánh
+                    if channel_id:
+                        await self.redis.publish("equinox_system", json.dumps({
+                            "event": "ai_rate_limit_429",
+                            "failed_persona": persona,
+                            "channel_id": channel_id,
+                            "user_id": user_id,
+                            "user_message": user_message
+                        }))
+                    return "*(Lỗi hệ thống: Giới hạn API 429. Đang kích hoạt giao thức dự phòng...)*"
+
             elif "401" in error_str or "403" in error_str:
                 await self._handle_api_error(token_id, 401)
-                return await self.generate_response(user_id, user_message, persona)
+                return await self.generate_response(user_id, user_message, persona, channel_id)
+
             return f"Lỗi không gian mạng: {error_str[:50]}..."
