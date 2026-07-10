@@ -13,6 +13,8 @@ class QuanGiaBot(commands.Bot):
         intents.message_content = True
         intents.members = True
         super().__init__(command_prefix="q!", intents=intents)
+        # Loại bỏ lệnh help mặc định
+        self.remove_command('help')
         # Nạp module giữ Status sáng đèn 24/7
         self.presence_proxy = PresenceProxy(self)
 
