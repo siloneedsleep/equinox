@@ -50,10 +50,10 @@ class QuanGiaCore(commands.Cog):
         self.db = KeyDBClient()
 
     # LỆNH OWNER TỐI CAO
-    @app_commands.command(name="owner", description="Mở bảng điều khiển trạm chỉ huy Equinox")
-    async def owner_dashboard(self, interaction: discord.Interaction):
-        if interaction.user.id != OWNER_ID:
-            return await interaction.response.send_message("🚫 Bạn không có quyền truy cập Bảng điều khiển tối cao.", ephemeral=True)
+    @commands.hybrid_command(name="owner", description="Mở bảng điều khiển trạm chỉ huy Equinox")
+    async def owner_dashboard(self, ctx: commands.Context):
+        if ctx.author.id != OWNER_ID:
+            return await ctx.send("🚫 Bạn không có quyền truy cập Bảng điều khiển tối cao.", ephemeral=True)
 
         note = await self.db.redis.get("system:bot_note") or "Không có ghi chú nào."
         
@@ -61,31 +61,31 @@ class QuanGiaCore(commands.Cog):
         embed.add_field(name="Trạng Thái Host", value="🟢 Render (Quản Gia)\n🟢 Wispbyte (Economy)", inline=False)
         embed.add_field(name="Ghi chú hệ thống", value=f"```\n{note}\n```", inline=False)
         
-        await interaction.response.send_message(embed=embed, view=OwnerDashboardView(self.db), ephemeral=True)
+        await ctx.send(embed=embed, view=OwnerDashboardView(self.db), ephemeral=True)
 
     # LỆNH BYPASS (MIỄN TRỪ)
-    @app_commands.command(name="bypass", description="Miễn trừ kỷ luật cho ID/Ping chỉ định")
-    async def bypass(self, interaction: discord.Interaction, target_id: str):
-        if interaction.user.id != OWNER_ID:
-            return await interaction.response.send_message("🚫 Lệnh từ chối.", ephemeral=True)
+    @commands.hybrid_command(name="bypass", description="Miễn trừ kỷ luật cho ID/Ping chỉ định")
+    async def bypass(self, ctx: commands.Context, target_id: str):
+        if ctx.author.id != OWNER_ID:
+            return await ctx.send("🚫 Lệnh từ chối.", ephemeral=True)
             
         target_id_clean = target_id.strip("<@!&>")
         await self.db.redis.sadd("guangia:bypass_list", target_id_clean)
-        await interaction.response.send_message(f"✅ Đã thêm {target_id} vào danh sách miễn trừ Bypass.", ephemeral=True)
+        await ctx.send(f"✅ Đã thêm {target_id} vào danh sách miễn trừ Bypass.", ephemeral=True)
 
     # LỆNH SETUP ROLE
-    @app_commands.command(name="role_bot_setup", description="Thiết lập quyền kế thừa cho Role")
+    @commands.hybrid_command(name="role_bot_setup", description="Thiết lập quyền kế thừa cho Role")
     @app_commands.describe(level="Cấp độ từ 0 đến 3", role="Role được gán", command_ids="Danh sách ID lệnh (cách nhau bằng phẩy)")
-    async def role_bot_setup(self, interaction: discord.Interaction, level: int, role: discord.Role, command_ids: str):
-        if interaction.user.id != OWNER_ID:
-            return await interaction.response.send_message("🚫 Lệnh từ chối.", ephemeral=True)
+    async def role_bot_setup(self, ctx: commands.Context, level: int, role: discord.Role, command_ids: str):
+        if ctx.author.id != OWNER_ID:
+            return await ctx.send("🚫 Lệnh từ chối.", ephemeral=True)
             
         await self.db.redis.hset(f"role_inheritance:level_{level}", role.id, command_ids)
-        await interaction.response.send_message(f"✅ Đã cấu hình {role.mention} ở Level {level} với các lệnh: {command_ids}", ephemeral=True)
+        await ctx.send(f"✅ Đã cấu hình {role.mention} ở Level {level} với các lệnh: {command_ids}", ephemeral=True)
 
-    # LỆNH HELP (Dạng Text Tường Minh)
-    @commands.command(name="help")
-    async def text_help(self, ctx):
+    # LỆNH HELP (Dạng Text Tường Minh - Hybrid)
+    @commands.hybrid_command(name="help", description="Hiển thị cẩm nang vận hành Quản Gia Equinox")
+    async def text_help(self, ctx: commands.Context):
         embed = discord.Embed(title="🪐 CẨM NANG VẬN HÀNH QUẢN GIA EQUINOX", color=discord.Color.blue())
         embed.description = "**Prefix hệ thống:** `q!`\n\n**🛡️ Nhóm Quản Trị (Level 3, 4)**\n`/owner` - Bảng điều khiển tối cao\n`/role_bot_setup` - Cấu hình quyền kế thừa\n`/bypass` - Danh sách miễn trừ\n\n**🖥️ Nhóm Treo Máy (Level 2+)**\n`/status add` - Đổi đèn Status\n`/livestatus` - Kích hoạt WebSocket 24/7\n`/voice247` - Treo Bot phòng Voice\n\n**🚨 Nhóm An Ninh (Level 1+)**\n`/mrbeast` - Đặt vùng tử địa chống Raider"
         await ctx.send(embed=embed)

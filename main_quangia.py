@@ -5,7 +5,7 @@ from discord.ext import commands
 import uvicorn
 from api.web_server import app
 from backend.presence_proxy import PresenceProxy
-from config.settings import QUANGIA_TOKEN, PORT
+from config.settings import QUANGIA_TOKEN, PORT, MAIN_GUILD_ID
 
 class QuanGiaBot(commands.Bot):
     def __init__(self):
@@ -22,8 +22,15 @@ class QuanGiaBot(commands.Bot):
         print("[Render] Đang nạp hệ thống lõi Quản Gia...")
         await self.load_extension("cogs_shared.quan_gia_core")
         
-        # Đồng bộ lệnh Slash lên Discord
-        await self.tree.sync()
+        # Đồng bộ lệnh Slash lên Discord (Ưu tiên Main Guild để cập nhật lập tức)
+        if MAIN_GUILD_ID:
+            main_guild = discord.Object(id=MAIN_GUILD_ID)
+            self.tree.copy_global_to(guild=main_guild)
+            await self.tree.sync(guild=main_guild)
+            print(f"[Render] Đã đồng bộ lệnh Slash cục bộ cho Guild ID: {MAIN_GUILD_ID}")
+        else:
+            await self.tree.sync()
+            print("[Render] Đã đồng bộ lệnh Slash toàn cầu (Global)")
         
         # Kích hoạt vòng lặp lắng nghe Redis Pub/Sub
         await self.presence_proxy.start_proxy()
