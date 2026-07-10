@@ -7,7 +7,7 @@ from config.settings import OWNER_ID
 class UpdateNoteModal(discord.ui.Modal, title="Cập Nhật Ghi Chú Hệ Thống"):
     note_input = discord.ui.TextInput(
         label="Nội dung ghi chú mới",
-        style=discord.ui.TextStyle.long,
+        style=discord.TextStyle.long,
         placeholder="Nhập ghi chú cho Luminous/Tenebris...",
         max_length=500
     )

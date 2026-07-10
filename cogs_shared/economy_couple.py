@@ -6,12 +6,12 @@ from backend.economy_engine import EconomyEngine
 class CoupleGiveawayModal(discord.ui.Modal, title="Tổ Chức Giveaway Đôi"):
     prize_input = discord.ui.TextInput(
         label="Phần Thưởng",
-        style=discord.ui.TextStyle.short,
+        style=discord.TextStyle.short,
         placeholder="Ví dụ: 100M Aequor, Nhẫn Kim Cương..."
     )
     desc_input = discord.ui.TextInput(
         label="Lời nhắn / Thể lệ",
-        style=discord.ui.TextStyle.long,
+        style=discord.TextStyle.long,
         placeholder="Nhập lời nhắn gửi đến server..."
     )
 
