@@ -1,0 +1,9 @@
+{
+  "name": "luminous-bot",
+  "version": "1.0.0",
+  "description": "Equinox Project - Luminous",
+  "main": "index.js",
+  "dependencies": {
+    "discord.js": "^14.14.1"
+  }
+}
