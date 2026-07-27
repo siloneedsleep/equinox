@@ -1,0 +1,5 @@
+{
+  "prefix": "l!",
+  "token": "YOUR_BOT_TOKEN_HERE",
+  "ownerIds": ["YOUR_DISCORD_ID_HERE"]
+}
